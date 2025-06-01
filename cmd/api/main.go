@@ -39,6 +39,16 @@ func setupRoutes(app *models.App) {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy"})
 	})
 
+	// Authentication routes (public)
+	auth := app.Router.Group("/auth")
+	{
+		auth.GET("/info", handlers.GetAuthInfo(app))
+		auth.POST("/register", handlers.CreateUser(app))
+		auth.POST("/login", handlers.Login(app))
+		auth.POST("/simple-login", handlers.SimpleLogin(app))
+		auth.POST("/verify", handlers.VerifyToken(app))
+	}
+
 	// Protected routes (require Firebase authentication)
 	api := app.Router.Group("/api")
 	api.Use(middleware.AuthMiddleware(app))

@@ -8,3 +8,4 @@
 .env.production.local
 internal/firebase/service_account.json
 main
+api
