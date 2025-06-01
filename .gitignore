@@ -7,3 +7,4 @@
 .env.test.local
 .env.production.local
 internal/firebase/service_account.json
+main
