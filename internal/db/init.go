@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func (app *models.App) InitDatabase() error {
+func InitDatabase(app *models.App) error {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		return fmt.Errorf("DATABASE_URL environment variable is required")
@@ -30,8 +30,43 @@ func (app *models.App) InitDatabase() error {
 	}
 
 	// Add default news sources if they don't exist
-	app.addDefaultSources()
+	AddDefaultSources(app)
 
 	log.Println("Database initialized successfully")
 	return nil
+}
+
+func AddDefaultSources(app *models.App) {
+	defaultSources := []models.NewsSource{
+		{
+			Name:   "BBC News",
+			URL:    "https://www.bbc.com/news",
+			RSSURL: "http://feeds.bbci.co.uk/news/rss.xml",
+			Active: true,
+		},
+		{
+			Name:   "Reuters",
+			URL:    "https://www.reuters.com",
+			RSSURL: "https://feeds.reuters.com/reuters/topNews",
+			Active: true,
+		},
+		{
+			Name:   "CNN",
+			URL:    "https://www.cnn.com",
+			RSSURL: "http://rss.cnn.com/rss/edition.rss",
+			Active: true,
+		},
+	}
+
+	for _, source := range defaultSources {
+		var existingSource models.NewsSource
+		result := app.DB.Where("rss_url = ?", source.RSSURL).First(&existingSource)
+		if result.Error != nil && result.Error == gorm.ErrRecordNotFound {
+			if err := app.DB.Create(&source).Error; err != nil {
+				log.Printf("Error creating default source %s: %v", source.Name, err)
+			} else {
+				log.Printf("Added default source: %s", source.Name)
+			}
+		}
+	}
 }

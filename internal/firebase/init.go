@@ -7,12 +7,11 @@ import (
 	"os"
 
 	firebase "firebase.google.com/go/v4"
-	"firebase.google.com/go/auth"
 	"github.com/mrrobotisreal/rss_today_api/internal/models"
 	"google.golang.org/api/option"
 )
 
-func (app *models.App) initFirebase() error {
+func InitFirebase(app *models.App) error {
 	ctx := context.Background()
 
 	// Initialize Firebase with service account key

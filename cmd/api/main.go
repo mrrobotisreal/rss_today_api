@@ -8,12 +8,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mmcdole/gofeed"
+	"github.com/mrrobotisreal/rss_today_api/internal/db"
+	"github.com/mrrobotisreal/rss_today_api/internal/firebase"
+	"github.com/mrrobotisreal/rss_today_api/internal/handlers"
+	"github.com/mrrobotisreal/rss_today_api/internal/middleware"
 	"github.com/mrrobotisreal/rss_today_api/internal/models"
+	"github.com/mrrobotisreal/rss_today_api/internal/services"
 	"github.com/robfig/cron/v3"
 )
 
 // Setup all routes
-func (app *models.App) setupRoutes() {
+func setupRoutes(app *models.App) {
 	app.Router = gin.Default()
 
 	// CORS
@@ -36,24 +41,24 @@ func (app *models.App) setupRoutes() {
 
 	// Protected routes (require Firebase authentication)
 	api := app.Router.Group("/api")
-	api.Use(app.AuthMiddleware())
+	api.Use(middleware.AuthMiddleware(app))
 	{
-		api.GET("/articles", app.GetArticles)
-		api.GET("/sources", app.GetSources)
-		api.POST("/alerts", app.CreateAlert)
-		api.GET("/alerts", app.GetUserAlerts)
-		api.POST("/monitor/trigger", app.TriggerMonitoring)
+		api.GET("/articles", handlers.GetArticles(app))
+		api.GET("/sources", handlers.GetSources(app))
+		api.POST("/alerts", handlers.CreateAlert(app))
+		api.GET("/alerts", handlers.GetUserAlerts(app))
+		api.POST("/monitor/trigger", handlers.TriggerMonitoring(app))
 	}
 }
 
 // Start the cron scheduler
-func (app *models.App) startScheduler() {
+func startScheduler(app *models.App) {
 	app.Cron = cron.New()
 
 	// Run every 10 minutes: "*/10 * * * *"
 	app.Cron.AddFunc("*/10 * * * *", func() {
 		log.Println("⏰ CRON JOB TRIGGERED - Running RSS monitoring...")
-		if err := app.MonitorAllSources(); err != nil {
+		if err := services.MonitorAllSources(app); err != nil {
 			log.Printf("Error in scheduled monitoring: %v", err)
 		}
 	})
@@ -68,26 +73,26 @@ func main() {
 	}
 
 	// Initialize Firebase
-	if err := app.InitFirebase(); err != nil {
+	if err := firebase.InitFirebase(app); err != nil {
 		log.Fatal("Failed to initialize Firebase:", err)
 	}
 
 	// Initialize database
-	if err := app.InitDatabase(); err != nil {
+	if err := db.InitDatabase(app); err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
 
 	// Setup routes
-	app.setupRoutes()
+	setupRoutes(app)
 
 	// Start cron scheduler
-	app.startScheduler()
+	startScheduler(app)
 
 	// Run initial monitoring after 10 seconds
 	go func() {
 		time.Sleep(10 * time.Second)
 		log.Println("Running initial RSS monitoring...")
-		if err := app.MonitorAllSources(); err != nil {
+		if err := services.MonitorAllSources(app); err != nil {
 			log.Printf("Error in initial monitoring: %v", err)
 		}
 	}()

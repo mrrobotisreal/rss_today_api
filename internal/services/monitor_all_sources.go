@@ -5,17 +5,19 @@ import (
 	"log"
 	"sync"
 	"time"
+
+	"github.com/mrrobotisreal/rss_today_api/internal/models"
 )
 
-func (app *models.App) MonitorAllSources() error {
-	app.mu.Lock()
-	app.lastRun = time.Now()
-	app.mu.Unlock()
+func MonitorAllSources(app *models.App) error {
+	app.Mu.Lock()
+	app.LastRun = time.Now()
+	app.Mu.Unlock()
 
 	log.Println("🔍 STARTING RSS MONITORING CYCLE...")
 
 	// Step 1: Get all active news sources from database
-	var sources []NewsSource
+	var sources []models.NewsSource
 	if err := app.DB.Where("active = ?", true).Find(&sources).Error; err != nil {
 		return fmt.Errorf("error fetching sources: %v", err)
 	}
@@ -23,24 +25,24 @@ func (app *models.App) MonitorAllSources() error {
 	log.Printf("Monitoring %d RSS sources", len(sources))
 
 	// Step 2: Process all sources concurrently using goroutines
-	var allNewArticles []Article
+	var allNewArticles []models.Article
 	var wg sync.WaitGroup
-	articlesChan := make(chan []Article, len(sources))
+	articlesChan := make(chan []models.Article, len(sources))
 
 	for _, source := range sources {
 		wg.Add(1)
-		go func(src NewsSource) {
+		go func(src models.NewsSource) {
 			defer wg.Done()
 
 			// Fetch RSS feed
-			articles, err := app.FetchRSSFeed(src)
+			articles, err := FetchRSSFeed(app, src)
 			if err != nil {
 				log.Printf("Error fetching RSS for %s: %v", src.Name, err)
 				return
 			}
 
 			// Save new articles to database
-			newArticles, err := app.SaveNewArticles(articles)
+			newArticles, err := SaveNewArticles(app, articles)
 			if err != nil {
 				log.Printf("Error saving articles for %s: %v", src.Name, err)
 				return
@@ -69,7 +71,7 @@ func (app *models.App) MonitorAllSources() error {
 	// Step 4: Check alerts and send notifications
 	if len(allNewArticles) > 0 {
 		log.Printf("📊 Found %d new articles total", len(allNewArticles))
-		if err := app.CheckAlertsForNewArticles(allNewArticles); err != nil {
+		if err := CheckAlertsForNewArticles(app, allNewArticles); err != nil {
 			log.Printf("Error checking alerts: %v", err)
 		}
 	} else {

@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func (app *models.App) AuthMiddleware() gin.HandlerFunc {
+func AuthMiddleware(app *models.App) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
