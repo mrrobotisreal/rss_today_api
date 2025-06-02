@@ -39,6 +39,9 @@ func setupRoutes(app *models.App) {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy"})
 	})
 
+	// Test endpoints
+	app.Router.GET("/test/google-news", handlers.TestGoogleNews(app))
+
 	// Authentication routes (public)
 	auth := app.Router.Group("/auth")
 	{

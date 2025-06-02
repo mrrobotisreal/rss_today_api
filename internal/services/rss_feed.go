@@ -3,7 +3,10 @@ package services
 import (
 	"crypto/sha256"
 	"fmt"
+	"html"
 	"log"
+	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -18,14 +21,30 @@ func FetchRSSFeed(app *models.App, source models.NewsSource) ([]models.Article, 
 		return nil, fmt.Errorf("error parsing RSS feed for %s: %v", source.Name, err)
 	}
 
+	// Initialize Google News decoder for this source if needed
+	var decoder *GoogleNewsDecoder
+	if strings.Contains(source.Name, "Google News") || strings.Contains(source.RSSURL, "news.google.com") {
+		decoder = NewGoogleNewsDecoder()
+		log.Printf("Initialized Google News decoder for %s", source.Name)
+	}
+
 	var articles []models.Article
 	for _, item := range feed.Items {
 		if item.Title == "" || item.Link == "" {
 			continue
 		}
 
+		// Clean and decode title
+		cleanTitle := CleanContent(item.Title)
+
+		// Clean and decode description
+		cleanDescription := CleanContent(item.Description)
+
+		// Process the link - decode Google News URLs if needed
+		cleanLink := processLink(item.Link, source.Name, decoder)
+
 		// Create content hash for duplicate detection
-		contentData := item.Title + item.Link + item.Description
+		contentData := cleanTitle + cleanLink + cleanDescription
 		hash := sha256.Sum256([]byte(contentData))
 		contentHash := fmt.Sprintf("%x", hash)
 
@@ -38,13 +57,13 @@ func FetchRSSFeed(app *models.App, source models.NewsSource) ([]models.Article, 
 		}
 
 		// Extract basic keywords from title and description
-		keywords := extractKeywords(item.Title + " " + item.Description)
+		keywords := extractKeywords(cleanTitle + " " + cleanDescription)
 
 		article := models.Article{
 			SourceID:    source.ID,
-			Title:       item.Title,
-			Description: item.Description,
-			Link:        item.Link,
+			Title:       cleanTitle,
+			Description: cleanDescription,
+			Link:        cleanLink,
 			PubDate:     pubDate,
 			ContentHash: contentHash,
 			Keywords:    keywords,
@@ -55,6 +74,83 @@ func FetchRSSFeed(app *models.App, source models.NewsSource) ([]models.Article, 
 
 	log.Printf("Parsed %d articles from %s", len(articles), source.Name)
 	return articles, nil
+}
+
+// CleanContent removes HTML tags, decodes HTML entities, and cleans up text
+func CleanContent(content string) string {
+	if content == "" {
+		return ""
+	}
+
+	// Decode HTML entities (like &amp;, &lt;, &gt;, &quot;, etc.)
+	content = html.UnescapeString(content)
+
+	// Remove HTML tags
+	htmlTagRegex := regexp.MustCompile(`<[^>]*>`)
+	content = htmlTagRegex.ReplaceAllString(content, "")
+
+	// Clean up extra whitespace
+	content = regexp.MustCompile(`\s+`).ReplaceAllString(content, " ")
+	content = strings.TrimSpace(content)
+
+	// Remove source name from end of Google News titles (like "... - BBC News")
+	sourcePattern := regexp.MustCompile(` - [^-]+$`)
+	content = sourcePattern.ReplaceAllString(content, "")
+
+	return content
+}
+
+// processLink handles Google News URL decoding and other link processing
+func processLink(link, sourceName string, decoder *GoogleNewsDecoder) string {
+	if link == "" {
+		return ""
+	}
+
+	// Check if this is a Google News redirect URL and we have a decoder
+	if decoder != nil && IsGoogleNewsURL(link) {
+		if decodedURL, err := decoder.DecodeGoogleNewsURL(link); err == nil && decodedURL != link {
+			log.Printf("Successfully decoded Google News URL for %s: %s -> %s", sourceName, link, decodedURL)
+			return decodedURL
+		} else {
+			log.Printf("Could not decode Google News URL for %s: %s", sourceName, link)
+		}
+	}
+
+	// Clean up other URL issues
+	parsedURL, err := url.Parse(link)
+	if err != nil {
+		log.Printf("Error parsing URL %s: %v", link, err)
+		return link
+	}
+
+	// Remove tracking parameters from URLs
+	cleanQuery := url.Values{}
+	for key, values := range parsedURL.Query() {
+		// Keep important parameters, remove tracking ones
+		if !isTrackingParameter(key) {
+			cleanQuery[key] = values
+		}
+	}
+	parsedURL.RawQuery = cleanQuery.Encode()
+
+	return parsedURL.String()
+}
+
+// isTrackingParameter identifies common tracking parameters to remove
+func isTrackingParameter(param string) bool {
+	trackingParams := map[string]bool{
+		"utm_source":   true,
+		"utm_medium":   true,
+		"utm_campaign": true,
+		"utm_term":     true,
+		"utm_content":  true,
+		"fbclid":       true,
+		"gclid":        true,
+		"ref":          true,
+		"source":       true,
+		"oc":           true, // Google News specific parameter
+	}
+	return trackingParams[strings.ToLower(param)]
 }
 
 func extractKeywords(text string) []string {

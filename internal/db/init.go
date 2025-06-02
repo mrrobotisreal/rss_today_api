@@ -38,6 +38,36 @@ func InitDatabase(app *models.App) error {
 
 func AddDefaultSources(app *models.App) {
 	defaultSources := []models.NewsSource{
+		// {
+		// 	Name:   "Google News",
+		// 	URL:    "https://news.google.com/",
+		// 	RSSURL: "https://news.google.com/rss",
+		// 	Active: true,
+		// },
+		{
+			Name:   "Fox News",
+			URL:    "https://www.foxnews.com/",
+			RSSURL: "https://moxie.foxnews.com/google-publisher/world.xml",
+			Active: true,
+		},
+		{
+			Name:   "Sky News",
+			URL:    "https://news.sky.com/",
+			RSSURL: "https://feeds.skynews.com/feeds/rss/world.xml",
+			Active: true,
+		},
+		// {
+		// 	Name:   "Breitbart",
+		// 	URL:    "https://www.breitbart.com/",
+		// 	RSSURL: "https://feeds.feedburner.com/breitbart",
+		// 	Active: true,
+		// },
+		{
+			Name:   "New York Post",
+			URL:    "https://nypost.com/",
+			RSSURL: "https://nypost.com/feed/",
+			Active: true,
+		},
 		{
 			Name:   "BBC News",
 			URL:    "https://www.bbc.com/news",
@@ -47,7 +77,7 @@ func AddDefaultSources(app *models.App) {
 		{
 			Name:   "Reuters",
 			URL:    "https://www.reuters.com",
-			RSSURL: "https://feeds.reuters.com/reuters/topNews",
+			RSSURL: "https://feeds.reuters.com/Reuters/worldNews",
 			Active: true,
 		},
 		{
