@@ -115,6 +115,19 @@ func main() {
 		port = "3001"
 	}
 
-	log.Printf("🚀 RSS Monitor API running on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, app.Router))
+	// Check if running in production mode
+	isProd := os.Getenv("PROD")
+
+	if isProd == "true" {
+		// Production mode - use TLS
+		certFile := "/etc/letsencrypt/live/api.rss-today.winapps.io/fullchain.pem"
+		keyFile := "/etc/letsencrypt/live/api.rss-today.winapps.io/privkey.pem"
+
+		log.Printf("🚀 RSS Monitor API running on port %s with TLS (Production Mode)", port)
+		log.Fatal(http.ListenAndServeTLS(":"+port, certFile, keyFile, app.Router))
+	} else {
+		// Development mode - use standard HTTP
+		log.Printf("🚀 RSS Monitor API running on port %s (Development Mode)", port)
+		log.Fatal(http.ListenAndServe(":"+port, app.Router))
+	}
 }
